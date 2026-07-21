@@ -1,0 +1,284 @@
+{% extends 'base.html' %}
+
+{% block styles %}
+<style>
+    body, html {
+      height: 100%;
+    }
+
+    .messages-box {
+      flex: 1;
+      overflow-y: auto;
+    }
+
+    .messages-list {
+      padding-left: 0;
+    }
+
+    .message {
+      margin-bottom: 15px;
+      list-style: none;
+    }
+
+    .message-text {
+      padding: 10px;
+      border-radius: 5px;
+    }
+
+    .sent {
+      background-color: #dcf8c6;
+      align-self: flex-end;
+    }
+
+    .received {
+      background-color: #f1f0f0;
+      align-self: flex-start;
+    }
+
+    .message-image {
+      display: block;
+      max-width: 260px;
+      max-height: 220px;
+      margin-top: 8px;
+      border-radius: 5px;
+      object-fit: contain;
+    }
+
+    .message-content p:last-child {
+      margin-bottom: 0;
+    }
+
+    .message-content pre {
+      background: #212529;
+      color: #f8f9fa;
+      padding: 12px;
+      border-radius: 5px;
+      overflow-x: auto;
+      white-space: pre-wrap;
+    }
+
+    .message-content code {
+      background: rgba(0, 0, 0, 0.08);
+      border-radius: 3px;
+      padding: 2px 4px;
+    }
+
+    .message-content pre code {
+      background: transparent;
+      padding: 0;
+    }
+
+    .message-form {
+      display: flex;
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      padding: 10px;
+      background-color: #f8f9fa;
+    }
+
+    .message-input {
+      flex: 1;
+      border-radius: 0;
+      border-right: none;
+    }
+
+    .image-input {
+      display: none;
+    }
+
+    .btn-attach,
+    .btn-send {
+      border-radius: 0;
+    }
+
+    .selected-image-name {
+      max-width: 180px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .chat-container {
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+    }
+  </style>
+{% endblock %}
+
+
+{% block content %}
+<div class="chat-container">
+  <div class="card flex-grow-1">
+    <div class="card-header bg-primary text-white">Chat</div>
+    {% if user.is_authenticated %}
+    <div class="card-header bg-primary text-white"><b>Welcome, {{user.username}}</b>   <a style="color: yellow;" href="logout">Logout</a></div>
+    {% else %}
+    <div class="card-header bg-primary text-white"><a style="color: yellow" href="login">Login</a>   <a style="color: yellow;" href="register">Register</a></div>
+    {% endif %}
+    <div class="card-body messages-box">
+      <ul class="list-unstyled messages-list">
+        {% for chat in chats %}
+          {% if chat.user == request.user %}
+        <li class="message sent">
+          <div class="message-text">
+            <div class="message-sender">
+              <b>You</b>
+            </div>
+            <div class="message-content">
+              {{chat.message|linebreaksbr}}
+            </div>
+          </div>
+        </li>
+
+        <li class="message received">
+          <div class="message-text">
+            <div class="message-sender">
+              <b>AI Chatbot</b>
+            </div>
+            <div class="message-content markdown-content">{{chat.response}}</div>
+          </div>
+        </li>
+          {% endif %}
+        {% endfor %}
+      </ul>
+    </div>
+    <br><br>
+    <br><br>
+    <br><br>
+  </div>
+  <form class="message-form" enctype="multipart/form-data">
+    {% csrf_token %}
+    <div class="input-group">
+      <input type="file" class="image-input" accept="image/jpeg,image/png,image/webp,image/gif">
+      <div class="input-group-prepend">
+        <button type="button" class="btn btn-outline-secondary btn-attach" title="Attach image">Image</button>
+      </div>
+      <input type="text" class="form-control message-input" placeholder="Type your message or attach an image...">
+      <div class="input-group-append">
+        <span class="input-group-text selected-image-name d-none"></span>
+        <button type="submit" class="btn btn-primary btn-send">Send</button>
+      </div>
+    </div>
+  </form>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dompurify/dist/purify.min.js"></script>
+<script>
+  const messagesList = document.querySelector('.messages-list');
+  const messageForm = document.querySelector('.message-form');
+  const messageInput = document.querySelector('.message-input');
+  const imageInput = document.querySelector('.image-input');
+  const attachButton = document.querySelector('.btn-attach');
+  const selectedImageName = document.querySelector('.selected-image-name');
+
+  marked.setOptions({
+    breaks: true,
+    gfm: true
+  });
+
+  function renderMarkdownElement(element) {
+    const markdown = element.textContent;
+    element.innerHTML = DOMPurify.sanitize(marked.parse(markdown));
+  }
+
+  function createMessage(sender, content, type, renderMarkdown = false, imageUrl = null) {
+    const messageItem = document.createElement('li');
+    messageItem.classList.add('message', type);
+
+    const messageText = document.createElement('div');
+    messageText.classList.add('message-text');
+
+    const messageSender = document.createElement('div');
+    messageSender.classList.add('message-sender');
+    const senderLabel = document.createElement('b');
+    senderLabel.textContent = sender;
+    messageSender.appendChild(senderLabel);
+
+    const messageContent = document.createElement('div');
+    messageContent.classList.add('message-content');
+    messageContent.textContent = content;
+
+    if (renderMarkdown) {
+      messageContent.classList.add('markdown-content');
+      renderMarkdownElement(messageContent);
+    }
+
+    messageText.appendChild(messageSender);
+    messageText.appendChild(messageContent);
+
+    if (imageUrl) {
+      const imagePreview = document.createElement('img');
+      imagePreview.classList.add('message-image');
+      imagePreview.src = imageUrl;
+      imagePreview.alt = 'Attached image';
+      messageText.appendChild(imagePreview);
+    }
+
+    messageItem.appendChild(messageText);
+    return messageItem;
+  }
+
+  function updateSelectedImageName() {
+    const image = imageInput.files[0];
+    if (image) {
+      selectedImageName.textContent = image.name;
+      selectedImageName.classList.remove('d-none');
+    } else {
+      selectedImageName.textContent = '';
+      selectedImageName.classList.add('d-none');
+    }
+  }
+
+  document.querySelectorAll('.markdown-content').forEach(renderMarkdownElement);
+
+  attachButton.addEventListener('click', () => {
+    imageInput.click();
+  });
+
+  imageInput.addEventListener('change', updateSelectedImageName);
+
+  messageForm.addEventListener('submit', (event) => {
+    event.preventDefault();
+
+    const message = messageInput.value.trim();
+    const image = imageInput.files[0];
+    if (message.length === 0 && !image) {
+      return;
+    }
+
+    const previewUrl = image ? URL.createObjectURL(image) : null;
+    messagesList.appendChild(createMessage('You', message || '[Image]', 'sent', false, previewUrl));
+
+    const formData = new FormData();
+    formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+    formData.append('message', message);
+    if (image) {
+      formData.append('image', image);
+    }
+
+    messageInput.value = '';
+    imageInput.value = '';
+    updateSelectedImageName();
+
+    fetch('', {
+      method: 'POST',
+      body: formData
+    })
+      .then(response => response.json())
+      .then(data => {
+        if (data.error) {
+          messagesList.appendChild(createMessage('AI Chatbot', data.error, 'received'));
+          return;
+        }
+        messagesList.appendChild(createMessage('AI Chatbot', data.response, 'received', true));
+      })
+      .catch(() => {
+        messagesList.appendChild(createMessage('AI Chatbot', 'Request failed. Check the runserver console for details.', 'received'));
+      });
+  });
+</script>
+{% endblock %}
