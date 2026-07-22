@@ -1,5 +1,6 @@
 import base64
 import os
+import re
 
 from dotenv import load_dotenv
 from django.contrib import auth
@@ -57,7 +58,7 @@ def ask_openai(message, image=None):
                         ],
                     },
                 ],
-                max_completion_tokens=1024,
+                max_completion_tokens=2048,
             )
         else:
             response = client.chat.completions.create(
@@ -72,7 +73,14 @@ def ask_openai(message, image=None):
     except OpenAIError as error:
         return f'AI API error: {error}'
 
-    return response.choices[0].message.content.strip()
+    content = response.choices[0].message.content
+    if content:
+        # Strip <think>...</think> tags and everything between them
+        content = re.sub(r'<think>.*?</think>', '', content, flags=re.DOTALL)
+        # Strip any unclosed <think> tag if the response was truncated
+        content = re.sub(r'<think>.*', '', content, flags=re.DOTALL)
+        content = content.strip()
+    return content
 
 
 @login_required(login_url='login')
